@@ -39,28 +39,18 @@ export async function completeOnboardingAction(
 
   const encryptedPassword = encryptSecret(parsed.data.appPassword);
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("complete_onboarding_admin", {
+  const { error } = await admin.rpc("complete_onboarding_admin", {
     p_user_id: user.id,
     p_name: parsed.data.name,
     p_sender_name: parsed.data.senderName,
     p_sender_email: parsed.data.senderEmail,
     p_encrypted_password: encryptedPassword,
   });
-
-  console.log("ONBOARDING RPC DATA:", data);
-
   if (error) {
-    console.error("ONBOARDING RPC ERROR:", {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    });
-
     return {
       status: "error",
-      message:
-        "We verified Gmail but could not save your settings. Please try again.",
+      message: "We verified Gmail but could not save your settings. Please try again.",
     };
   }
+  redirect("/dashboard");
 }
