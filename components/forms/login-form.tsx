@@ -7,8 +7,10 @@ import { SubmitButton } from "@/components/submit-button";
 import { loginAction } from "@/lib/actions/auth";
 import { initialActionState } from "@/lib/actions/state";
 
-export function LoginForm() {
-  const [state, action] = useActionState(loginAction, initialActionState);
+export function LoginForm({ confirmationError = false }: { confirmationError?: boolean }) {
+  const [state, action] = useActionState(loginAction, confirmationError
+    ? { status: "error" as const, message: "That confirmation link is invalid or has expired. Request a new signup link and try again." }
+    : initialActionState);
   return (
     <form action={action} className="space-y-4">
       <FormStatus state={state} />

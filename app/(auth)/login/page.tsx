@@ -6,7 +6,8 @@ import { redirectIfAuthenticated } from "@/lib/auth/guards";
 export const metadata: Metadata = { title: "Log in" };
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await redirectIfAuthenticated();
-  return <AuthShell eyebrow="Welcome back" title="Log in to your workspace" description="Continue building thoughtful outreach with your own sending account."><LoginForm /></AuthShell>;
+  const { error } = await searchParams;
+  return <AuthShell eyebrow="Welcome back" title="Log in to your workspace" description="Continue building thoughtful outreach with your own sending account."><LoginForm confirmationError={error === "confirmation"} /></AuthShell>;
 }

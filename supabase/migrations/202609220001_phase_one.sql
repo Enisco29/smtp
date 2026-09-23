@@ -27,11 +27,13 @@ create table private.smtp_account_secrets (
   updated_at timestamptz not null default now()
 );
 
-create table private.smtp_verification_limits (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  window_started_at timestamptz not null default now(),
-  attempts integer not null default 0 check (attempts >= 0)
+create table private.smtp_verification_attempts (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  attempted_at timestamptz not null default now()
 );
+create index smtp_verification_attempts_user_time_idx
+on private.smtp_verification_attempts (user_id, attempted_at);
 
 create or replace function private.set_updated_at()
 returns trigger language plpgsql set search_path = '' as $$
@@ -81,22 +83,22 @@ returns table (allowed boolean, retry_after_seconds integer)
 language plpgsql security definer set search_path = '' as $$
 declare
   actor uuid := auth.uid();
-  row_data private.smtp_verification_limits%rowtype;
-  window_length interval := interval '15 minutes';
-  attempt_limit integer := 5;
+  oldest_attempt timestamptz;
+  recent_attempts integer;
 begin
   if actor is null then raise exception 'Authentication required'; end if;
-  insert into private.smtp_verification_limits (user_id, attempts)
-  values (actor, 1)
-  on conflict (user_id) do update set
-    window_started_at = case when private.smtp_verification_limits.window_started_at <= now() - window_length then now() else private.smtp_verification_limits.window_started_at end,
-    attempts = case when private.smtp_verification_limits.window_started_at <= now() - window_length then 1 else private.smtp_verification_limits.attempts + 1 end
-  returning * into row_data;
-  if row_data.attempts > attempt_limit then
-    return query select false, greatest(1, ceil(extract(epoch from ((row_data.window_started_at + window_length) - now())))::integer);
-  else
-    return query select true, 0;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(actor::text, 0));
+  delete from private.smtp_verification_attempts
+  where user_id = actor and attempted_at <= now() - interval '15 minutes';
+  select count(*)::integer, min(attempted_at)
+  into recent_attempts, oldest_attempt
+  from private.smtp_verification_attempts where user_id = actor;
+  if recent_attempts >= 5 then
+    return query select false, greatest(1, ceil(extract(epoch from ((oldest_attempt + interval '15 minutes') - now())))::integer);
+    return;
   end if;
+  insert into private.smtp_verification_attempts (user_id) values (actor);
+  return query select true, 0;
 end;
 $$;
 revoke all on function public.consume_smtp_verification_attempt() from public, anon;

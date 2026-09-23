@@ -2,9 +2,14 @@ import "server-only";
 import nodemailer from "nodemailer";
 import { smtpErrorMessage } from "@/lib/smtp/errors";
 
-export type SmtpVerificationResult = { ok: true } | { ok: false; message: string };
+export type SmtpVerificationResult =
+  | { ok: true }
+  | { ok: false; message: string };
 
-export async function verifyGmailCredentials(email: string, appPassword: string): Promise<SmtpVerificationResult> {
+export async function verifyGmailCredentials(
+  email: string,
+  appPassword: string,
+): Promise<SmtpVerificationResult> {
   const transport = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -18,7 +23,12 @@ export async function verifyGmailCredentials(email: string, appPassword: string)
     await transport.verify();
     return { ok: true };
   } catch (error: unknown) {
-    return { ok: false, message: smtpErrorMessage(error as { code?: string; responseCode?: number }) };
+    return {
+      ok: false,
+      message: smtpErrorMessage(
+        error as { code?: string; responseCode?: number },
+      ),
+    };
   } finally {
     transport.close();
   }
