@@ -18,6 +18,9 @@ export function RecipientImport({ campaignId, hasRecipients }: { campaignId: str
 
   async function submit(endpoint: "preview" | "confirm") {
     if (!file) return;
+    if (endpoint === "confirm" && hasRecipients && !window.confirm(
+      "Replace the recipient list? This also deletes any drafts generated for the current recipients."
+    )) return;
     setBusy(endpoint);
     setError("");
     setSuccess("");
