@@ -1,19 +1,10 @@
 import { revalidatePath } from "next/cache";
-import { decryptAiKey } from "@/lib/ai/keys";
 import { generateEmail, safeAiFailure } from "@/lib/ai/generate-email";
-import { isAiProvider, type AiProvider } from "@/lib/ai/providers";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { AiConfigurationError, loadUserAiProvider } from "@/lib/ai/user-provider";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const modelVariables: Record<AiProvider, string> = {
-  openai: "OPENAI_MODEL_ID",
-  groq: "GROQ_MODEL_ID",
-  claude: "CLAUDE_MODEL_ID",
-  gemini: "GEMINI_MODEL_ID",
-};
 
 type Claim = {
   draft_id: string;
@@ -21,6 +12,7 @@ type Claim = {
   recipient_email: string;
   recipient_data: Record<string, unknown>;
   token: string;
+  content_revision: number;
 };
 
 async function counts(
@@ -28,15 +20,14 @@ async function counts(
   campaignId: string,
   total: number,
 ) {
-  const [generated, failed, processing] = await Promise.all(
-    ["generated", "failed", "processing"].map((status) =>
-      supabase
-        .from("email_drafts")
-        .select("id", { count: "exact", head: true })
-        .eq("campaign_id", campaignId)
-        .eq("status", status),
-    ),
-  );
+  const [generated, failed, processing] = await Promise.all([
+    supabase.from("email_drafts").select("id", { count: "exact", head: true })
+      .eq("campaign_id", campaignId).in("status", ["generated", "edited", "approved", "excluded"]),
+    supabase.from("email_drafts").select("id", { count: "exact", head: true })
+      .eq("campaign_id", campaignId).eq("status", "failed"),
+    supabase.from("email_drafts").select("id", { count: "exact", head: true })
+      .eq("campaign_id", campaignId).eq("status", "processing"),
+  ]);
   if (generated.error || failed.error || processing.error)
     throw new Error("Could not load generation progress.");
   const generatedCount = generated.count ?? 0;
@@ -88,67 +79,27 @@ export async function POST(
       { status: 409 },
     );
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("active_ai_provider")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!isAiProvider(profile?.active_ai_provider)) {
-    return Response.json(
-      { message: "Choose an AI provider and save its API key in Settings." },
-      { status: 409 },
-    );
-  }
-  const provider = profile.active_ai_provider;
-  const model = process.env[modelVariables[provider]];
-  if (!model)
-    return Response.json(
-      {
-        message: `${modelVariables[provider]} is not configured on the server.`,
-      },
-      { status: 503 },
-    );
-  const generationModel = model;
   const campaignInstructions = campaign.instructions;
   const actorId = user.id;
 
   let retryFailed = false;
   try {
     retryFailed =
-      ((await request.json()) as { retryFailed?: unknown }).retryFailed ===
-      true;
+      ((await request.json()) as { retryFailed?: unknown }).retryFailed === true;
   } catch {
-    return Response.json(
-      { message: "Invalid generation request." },
-      { status: 400 },
-    );
+    return Response.json({ message: "Invalid generation request." }, { status: 400 });
   }
 
-  const admin = createAdminClient();
-  const { data: encrypted, error: keyError } = await admin.rpc(
-    "get_ai_key_admin",
-    { p_user_id: user.id, p_provider: provider },
-  );
-  if (keyError || typeof encrypted !== "string") {
-    return Response.json(
-      {
-        message:
-          "Your selected provider has no saved API key. Add one in Settings.",
-      },
-      { status: 409 },
-    );
-  }
-  let apiKey: string;
+  let providerConfig: Awaited<ReturnType<typeof loadUserAiProvider>>;
   try {
-    apiKey = decryptAiKey(encrypted);
-  } catch {
-    return Response.json(
-      {
-        message: "The saved AI key could not be read. Replace it in Settings.",
-      },
-      { status: 503 },
-    );
+    providerConfig = await loadUserAiProvider(supabase, user.id);
+  } catch (error) {
+    const failure = error instanceof AiConfigurationError
+      ? error
+      : new AiConfigurationError(503, "AI configuration could not be loaded.");
+    return Response.json({ message: failure.message }, { status: failure.status });
   }
+  const { provider, model: generationModel, apiKey, admin } = providerConfig;
 
   const { data, error: claimError } = await admin.rpc(
     "claim_campaign_drafts_admin",
@@ -197,6 +148,7 @@ export async function POST(
           p_user_id: actorId,
           p_draft_id: claim.draft_id,
           p_token: claim.token,
+          p_expected_revision: claim.content_revision,
           p_status: "generated",
           p_subject: draft.subject,
           p_body: draft.body,
@@ -210,6 +162,7 @@ export async function POST(
           p_user_id: actorId,
           p_draft_id: claim.draft_id,
           p_token: claim.token,
+          p_expected_revision: claim.content_revision,
           p_status: "failed",
           p_failure_code: code,
         });

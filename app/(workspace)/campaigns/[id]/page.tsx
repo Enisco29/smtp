@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CampaignDrafts } from "@/components/campaign-drafts";
+import { CampaignDraftSummary } from "@/components/campaign-draft-summary";
 import { DeleteCampaignForm } from "@/components/forms/delete-campaign-form";
 import { RecipientImport } from "@/components/forms/recipient-import";
 import { requireOnboardedUser } from "@/lib/auth/guards";
@@ -13,13 +13,11 @@ const PAGE_SIZE = 50;
 
 export default async function CampaignPage({ params, searchParams }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; draftPage?: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const user = await requireOnboardedUser();
   const { id } = await params;
   const pageValue = Number((await searchParams).page ?? "1");
-  const draftPageValue = Number((await searchParams).draftPage ?? "1");
-  const draftPage = Number.isSafeInteger(draftPageValue) && draftPageValue > 0 ? draftPageValue : 1;
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const supabase = await createClient();
   const { data: campaign, error } = await supabase.from("campaigns")
@@ -52,7 +50,7 @@ export default async function CampaignPage({ params, searchParams }: {
 
       {campaign.status === "draft" ? <section className="mt-9"><h2 className="text-xl font-bold tracking-[-.03em]">Upload recipients</h2><p className="mt-2 text-sm leading-6 text-[#65736f]">Upload a CSV with an <span className="font-semibold">email</span> column. You can fix and re-upload a file without recreating this campaign.</p><div className="mt-4"><RecipientImport campaignId={campaign.id} hasRecipients={recipientCount > 0} /></div></section> : null}
 
-      <CampaignDrafts campaignId={campaign.id} recipientCount={recipientCount} isDraft={campaign.status === "draft"} page={draftPage} />
+      <CampaignDraftSummary campaignId={campaign.id} recipientCount={recipientCount} isDraft={campaign.status === "draft"} />
 
       <section className="mt-10"><div className="flex items-end justify-between"><div><h2 className="text-xl font-bold tracking-[-.03em]">Recipient list</h2><p className="mt-1 text-sm text-[#65736f]">{recipientCount} saved recipient{recipientCount === 1 ? "" : "s"}</p></div></div>
         {recipientsError ? <p role="alert" className="mt-5 text-sm text-[#b42318]">Could not load recipients. Please refresh the page.</p> : null}

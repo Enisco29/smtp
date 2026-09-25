@@ -39,3 +39,12 @@ Apply `supabase/migrations/202609250001_replace_grok_with_groq.sql` with:
 Set `GROQ_MODEL_ID=openai/gpt-oss-20b` on the server (or another model supporting [Groq strict structured outputs](https://console.groq.com/docs/structured-outputs)). Remove the obsolete `GROK_MODEL_ID` variable. Users save a Groq API key in Settings and select Groq as their active provider; no server `GROQ_API_KEY` is required.
 
 This migration permanently deletes saved xAI/Grok keys and clears active Grok selections. It preserves other providers' keys and all generated drafts. Existing xAI keys cannot be reused for Groq; users must enter a new Groq key. Apply the migration before deploying the updated app.
+
+
+## Phase 4 draft review migration
+
+Draft editing, AI regeneration/refinement, approval, exclusion, restoration, and revision-safe concurrency are added by `supabase/migrations/202609250002_phase4_draft_review.sql`. Apply it after the Groq migration with:
+
+`npx supabase db push`
+
+Phase 4 adds no environment variables. It continues to use `AI_KEY_ENCRYPTION_KEY` and the existing provider model-ID variables. The application never sends provider keys to the browser, and SMTP delivery remains unimplemented.
