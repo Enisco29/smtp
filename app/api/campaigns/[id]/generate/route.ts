@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 const modelVariables: Record<AiProvider, string> = {
   openai: "OPENAI_MODEL_ID",
-  grok: "GROK_MODEL_ID",
+  groq: "GROQ_MODEL_ID",
   claude: "CLAUDE_MODEL_ID",
   gemini: "GEMINI_MODEL_ID",
 };

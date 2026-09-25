@@ -85,18 +85,13 @@ async function postJson(
     throw new AiGenerationError("provider_unavailable");
   }
   if (!response.ok) {
-    const errorBody = await response.text();
-
-    console.error("AI PROVIDER HTTP ERROR:", {
-      status: response.status,
-      body: errorBody,
-    });
-
     if (response.status === 401) {
       throw new AiGenerationError("invalid_key");
     }
 
     if (response.status === 403) {
+      // Inspect only for safe classification; never log or return provider bodies.
+      const errorBody = await response.text().catch(() => "");
       if (
         errorBody.includes("used all available credits") ||
         errorBody.includes("monthly spending limit")
@@ -169,48 +164,27 @@ export async function generateEmail(
         .find((item) => item.type === "output_text")?.text,
     );
   }
-  if (provider === "grok") {
+  if (provider === "groq") {
     const result = (await postJson(
-      "https://api.x.ai/v1/responses",
-      {
-        Authorization: `Bearer ${apiKey}`,
-      },
+      "https://api.groq.com/openai/v1/chat/completions",
+      { Authorization: `Bearer ${apiKey}` },
       {
         model,
-        input: [
-          {
-            role: "system",
-            content: system,
-          },
-          {
-            role: "user",
-            content: user,
-          },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
-        text: {
-          format: {
-            type: "json_schema",
+        response_format: {
+          type: "json_schema",
+          json_schema: {
             name: "email_draft",
             schema: jsonSchema,
             strict: true,
           },
         },
-        store: false,
       },
-    )) as {
-      output?: {
-        content?: {
-          type?: string;
-          text?: string;
-        }[];
-      }[];
-    };
-
-    const text = result.output
-      ?.flatMap((item) => item.content ?? [])
-      .find((item) => item.type === "output_text")?.text;
-
-    return parseDraft(text);
+    )) as { choices?: { message?: { content?: string | null } }[] };
+    return parseDraft(result.choices?.[0]?.message?.content);
   }
   if (provider === "claude") {
     const result = (await postJson(

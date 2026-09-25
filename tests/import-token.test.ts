@@ -13,7 +13,10 @@ describe("CSV preview tokens", () => {
 
   it("rejects altered or unsigned preview data", () => {
     const token = signImportToken(claims, key);
-    expect(verifyImportToken(`${token.slice(0, -1)}A`, key, 9_000)).toBeNull();
+    const [payload, signature] = token.split(".");
+    // Alter a full signature character, avoiding no-op and base64 padding changes.
+    const altered = `${signature[0] === "A" ? "B" : "A"}${signature.slice(1)}`;
+    expect(verifyImportToken(`${payload}.${altered}`, key, 9_000)).toBeNull();
     expect(verifyImportToken("fake.fake", key, 9_000)).toBeNull();
   });
 });
