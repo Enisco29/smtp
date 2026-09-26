@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowRight, FolderOpen, Plus } from "lucide-react";
 import Link from "next/link";
+import { CampaignStatusSummary } from "@/components/campaign-status-summary";
 import { requireOnboardedUser } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,7 +32,7 @@ export default async function CampaignsPage() {
       ) : null}
       {campaigns?.length ? <div className="mt-9 grid gap-3">
         {campaigns.map((campaign) => <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className="card flex items-center justify-between gap-4 rounded-2xl p-5 transition hover:border-[#aacfc0] hover:shadow-md">
-          <div className="min-w-0"><h2 className="truncate font-bold">{campaign.name}</h2><p className="mt-1 text-xs text-[#71807b]">Created {new Date(campaign.created_at).toLocaleDateString()}</p></div>
+          <div className="min-w-0"><h2 className="truncate font-bold">{campaign.name}</h2><p className="mt-1 text-xs text-[#71807b]">Created {new Date(campaign.created_at).toLocaleDateString()}</p><p className="mt-1"><CampaignStatusSummary campaignId={campaign.id} status={campaign.status} /></p></div>
           <div className="flex shrink-0 items-center gap-3"><span className="rounded-full bg-[#eef7f3] px-2.5 py-1 text-xs font-bold capitalize text-[#146c54]">{campaign.status}</span><ArrowRight size={18} className="text-[#71807b]" /></div>
         </Link>)}
       </div> : null}

@@ -1,6 +1,6 @@
 # Relaycraft
 
-Relaycraft supports authentication, sender onboarding, campaign creation, CSV recipient import, and AI-generated email drafts. Email sending is not implemented.
+Relaycraft supports authentication, sender onboarding, campaign creation, CSV recipient import, and AI-generated email drafts. Approved emails can be sent individually through Gmail, with persisted delivery monitoring.
 
 ## Local setup
 
@@ -47,4 +47,18 @@ Draft editing, AI regeneration/refinement, approval, exclusion, restoration, and
 
 `npx supabase db push`
 
-Phase 4 adds no environment variables. It continues to use `AI_KEY_ENCRYPTION_KEY` and the existing provider model-ID variables. The application never sends provider keys to the browser, and SMTP delivery remains unimplemented.
+Phase 4 adds no environment variables. It continues to use `AI_KEY_ENCRYPTION_KEY` and the existing provider model-ID variables. The application never sends provider keys to the browser, and Phase 5 adds Gmail delivery separately.
+
+## Phase 5 SMTP sending
+
+Apply `supabase/migrations/202609250003_smtp_sending.sql` from the linked repository with:
+
+`npx supabase db push`
+
+Optional server-only variables are `SMTP_DAILY_SEND_LIMIT=100` (1–500 attempts per rolling 24 hours), `SMTP_SEND_DELAY_MS=2000` (1,000–10,000 milliseconds), and `SMTP_SEND_BATCH_SIZE=10` (1–10). Existing SMTP encryption and service-role variables remain required. Database claims enforce the configured quota, pacing, and a single in-flight email per account across campaigns. Gmail may impose additional restrictions, including sending performed outside Relaycraft; these local limits cannot measure that usage.
+
+Sending requires explicit confirmation. The campaign sender name and address are frozen on first confirmation; reconnecting accepts only a new App Password for that same address. Account Settings changes do not change a started campaign. Only approved content is sent, as plain text. Sending proceeds while the page is open; saved progress survives closing it, and remaining work can be resumed after confirmation. Every attempt has a 22-second deadline, and new claims stop when insufficient time remains in the 60-second route.
+
+Definitive temporary failures can be explicitly retried once per confirmed retry run. Authentication failures require reconnecting first. Interrupted transmission or an expired claim is marked uncertain and cannot be retried. Finish Campaign closes remaining work without sending or deleting it. All content in delivery states is read-only.
+
+`npm test` includes an isolated PostgreSQL runtime that applies the migrations and validates ownership, claims, quota, retry, and finish transitions. Nodemailer is mocked; tests send no real email. Apply the migration before deploying the updated app.

@@ -22,7 +22,7 @@ async function counts(
 ) {
   const [generated, failed, processing] = await Promise.all([
     supabase.from("email_drafts").select("id", { count: "exact", head: true })
-      .eq("campaign_id", campaignId).in("status", ["generated", "edited", "approved", "excluded"]),
+      .eq("campaign_id", campaignId).in("status", ["generated", "edited", "approved", "excluded", "sending", "sent", "send_failed", "uncertain"]),
     supabase.from("email_drafts").select("id", { count: "exact", head: true })
       .eq("campaign_id", campaignId).eq("status", "failed"),
     supabase.from("email_drafts").select("id", { count: "exact", head: true })
@@ -64,9 +64,9 @@ export async function POST(
     .maybeSingle();
   if (!campaign)
     return Response.json({ message: "Campaign not found." }, { status: 404 });
-  if (campaign.status !== "draft")
+  if (!["draft", "sending"].includes(campaign.status))
     return Response.json(
-      { message: "Only draft campaigns can generate emails." },
+      { message: "Only open campaigns can generate emails." },
       { status: 409 },
     );
   const { count: recipientCount, error: recipientError } = await supabase

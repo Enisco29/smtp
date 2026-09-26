@@ -8,6 +8,10 @@ export const draftStatuses = [
   "approved",
   "failed",
   "excluded",
+  "sending",
+  "sent",
+  "send_failed",
+  "uncertain",
 ] as const;
 
 export type DraftStatus = (typeof draftStatuses)[number];
@@ -31,5 +35,5 @@ export function recipientName(data: Record<string, unknown> | null | undefined) 
 }
 
 export function needsAttention(status: DraftStatus) {
-  return status !== "approved" && status !== "excluded";
+  return !["approved", "excluded", "sent"].includes(status);
 }

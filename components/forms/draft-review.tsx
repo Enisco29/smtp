@@ -16,6 +16,7 @@ type Props = {
   body: string;
   status: string;
   revision: number;
+  readOnly?: boolean;
 };
 
 type Preview = {
@@ -56,9 +57,10 @@ export function DraftReviewControls(props: Props) {
     } finally { setBusy(null); }
   }
 
-  const canReview = ["generated", "edited", "approved"].includes(props.status);
+  const canReview = !props.readOnly && ["generated", "edited", "approved"].includes(props.status);
   return <div className="space-y-6">
-    {props.status === "excluded" ? <div className="card rounded-2xl p-5">
+    {!canReview ? <section className="card rounded-2xl p-6"><h2 className="text-lg font-bold">Saved email</h2><p className="mt-4 font-semibold">{props.subject}</p><p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[#53645f]">{props.body}</p></section> : null}
+    {!props.readOnly && props.status === "excluded" ? <div className="card rounded-2xl p-5">
       <p className="text-sm text-[#65736f]">This recipient is excluded from future sending. Restoring keeps the content but requires approval again.</p>
       <form action={restoreAction} className="mt-4"><button className="button-primary" disabled={restoring}><Undo2 size={17} /> {restoring ? "Restoring…" : "Restore recipient"}</button></form>
       {restoreState.message ? <div className="mt-3"><FormStatus state={restoreState} /></div> : null}

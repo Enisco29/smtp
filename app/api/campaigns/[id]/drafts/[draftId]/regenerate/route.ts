@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: {
   const { data: campaign } = await supabase.from("campaigns")
     .select("id, instructions, status").eq("id", id).eq("user_id", user.id).maybeSingle();
   if (!campaign) return Response.json({ message: "Campaign not found." }, { status: 404 });
-  if (campaign.status !== "draft") return Response.json({ message: "Only draft campaigns can be changed." }, { status: 409 });
+  if (!["draft", "sending"].includes(campaign.status)) return Response.json({ message: "This campaign is closed for changes." }, { status: 409 });
   const { data: draft } = await supabase.from("email_drafts")
     .select("id, subject, body, status, content_revision, recipients(email, data)")
     .eq("id", draftId).eq("campaign_id", id).maybeSingle();
